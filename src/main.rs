@@ -15,6 +15,7 @@ mod uart0;
 mod mailbox;
 mod panic_handler;
 mod self_update;
+mod random;
 
 const MMIO_BASE: usize = 0x3F00_0000;
 
@@ -58,6 +59,9 @@ fn entry() -> ! {
         Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
     }
 
+    let rand = random::get_rng();
+    rand.init();
+
     loop {
         let c = uart.getc();
         if c == '^' {
@@ -66,6 +70,10 @@ fn entry() -> ! {
                 ::core::fmt::write(uart, format_args!("{:?}", e));
             }
         } else if c == '\n' {
+            uart.newline();
+        } else if c == 'r' {
+            uart.puts("0x");
+            uart.send_hex_u32(rand.rand());
             uart.newline();
         } else {
             uart.send(c);

@@ -1,7 +1,7 @@
-use super::{MMIO_BASE, sleep};
+use super::{MMIO_BASE};
 use register::{mmio::{ReadOnly, WriteOnly}, register_bitfields};
 use core::hint::spin_loop;
-use core::sync::atomic::{fence, compiler_fence, Ordering, AtomicU8, AtomicU32};
+use core::sync::atomic::{compiler_fence, Ordering, AtomicU8, AtomicU32};
 use core::slice;
 
 register_bitfields!{
