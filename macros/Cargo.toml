@@ -1,10 +1,12 @@
 [package]
-name = "kernel8"
+name = "macros"
 version = "0.1.0"
 authors = ["Jack Wickham <jackwickham@live.co.uk>"]
 edition = "2018"
 
 [dependencies]
-init = { path = "init" }
-macros = { path = "macros" }
-register = "0.3.2"
+syn = "0.15"
+quote = "0.6"
+
+[lib]
+proc-macro = true
