@@ -16,6 +16,7 @@ mod mailbox;
 mod panic_handler;
 mod self_update;
 mod random;
+mod timer;
 
 const MMIO_BASE: usize = 0x3F00_0000;
 
@@ -59,13 +60,15 @@ fn entry() -> ! {
         Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
     }
 
+    timer::get_timer().sleep_usec(1_000_000);
+    uart.puts("Slept for one second");
+
     let rand = random::get_rng();
     rand.init();
 
     loop {
         let c = uart.getc();
         if c == '^' {
-            //uart.puts("\nPreparing to update code\n");
             if let Err(e) = self_update::self_update(&uart) {
                 ::core::fmt::write(uart, format_args!("{:?}", e));
             }
@@ -82,13 +85,3 @@ fn entry() -> ! {
 }
 
 init::entry!(entry);
-
-
-#[inline]
-pub fn sleep(cycles: u64) {
-    for _ in 0..cycles {
-        unsafe {
-            asm!("nop" :::: "volatile");
-        }
-    }
-}

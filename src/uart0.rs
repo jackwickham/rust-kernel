@@ -22,7 +22,8 @@
  * SOFTWARE.
  */
 
-use super::{MMIO_BASE, sleep};
+use super::MMIO_BASE;
+use crate::timer::sleep_cycles;
 use crate::gpio;
 use crate::mailbox;
 use core::{
@@ -160,13 +161,13 @@ impl Uart {
         gpio::GPFSEL1.modify(gpio::GPFSEL1::FSEL14::TXD0 + gpio::GPFSEL1::FSEL15::RXD0);
         gpio::GPPUD.set(0);
 
-        sleep(150);
+        sleep_cycles(150);
 
         gpio::GPPUDCLK0.write(
             gpio::GPPUDCLK0::PUDCLK14::AssertClock + gpio::GPPUDCLK0::PUDCLK15::AssertClock
         );
 
-        sleep(150);
+        sleep_cycles(150);
 
         gpio::GPPUDCLK0.set(0);
 

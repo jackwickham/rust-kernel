@@ -1,5 +1,4 @@
 use super::MMIO_BASE;
-use core::ops;
 use register::{mmio::*, register_bitfields};
 use core::hint::spin_loop;
 

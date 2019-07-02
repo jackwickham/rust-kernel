@@ -22,7 +22,8 @@
  * SOFTWARE.
  */
 
-use super::{MMIO_BASE, sleep};
+use super::MMIO_BASE;
+use crate::timer::sleep_cycles;
 use crate::gpio;
 use core::ops;
 use register::{mmio::*, register_bitfields};
@@ -167,12 +168,12 @@ impl MiniUart {
         gpio::GPFSEL1.modify(gpio::GPFSEL1::FSEL14::TXD1 + gpio::GPFSEL1::FSEL15::RXD1);
 
         (*gpio::GPPUD).set(0); // enable pins 14 and 15
-        sleep(150);
+        sleep_cycles(150);
 
         gpio::GPPUDCLK0.write(
             gpio::GPPUDCLK0::PUDCLK14::AssertClock + gpio::GPPUDCLK0::PUDCLK15::AssertClock,
         );
-        sleep(150);
+        sleep_cycles(150);
 
         gpio::GPPUDCLK0.set(0);
 
