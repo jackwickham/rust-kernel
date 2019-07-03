@@ -1,4 +1,5 @@
 use crate::uart1::MiniUart;
+use crate::power;
 
 use core::fmt;
 use core::panic::PanicInfo;
@@ -10,10 +11,5 @@ fn panic(info: &PanicInfo) -> ! {
     
     fmt::write(&mut uart, format_args!("{:?}", info));
 
-    // Park this core
-    loop {
-        unsafe {
-            asm!("wfe" ::::);
-        }
-    }
+    power::get_power_manager().reboot()
 }

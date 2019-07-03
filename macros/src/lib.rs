@@ -70,12 +70,12 @@ pub fn make_iterable_enum(input: TokenStream) -> TokenStream {
             quote! {
                 impl #name {
                     /// Get an iterator over the values of this enum
-                    fn values() -> #state_enum_name {
+                    pub fn values() -> #state_enum_name {
                         #state_enum_name{ next: #first }
                     }
                 }
 
-                struct #state_enum_name {
+                pub struct #state_enum_name {
                     /// The value to be returned next time next() is called.
                     /// Storing the next value means that we only need one
                     /// version of it, so we don't need to force Copy or Clone

@@ -3,6 +3,7 @@ use register::{mmio::{ReadOnly, WriteOnly}, register_bitfields};
 use core::hint::spin_loop;
 use core::sync::atomic::{compiler_fence, Ordering, AtomicU8, AtomicU32};
 use core::slice;
+use macros::*;
 
 register_bitfields!{
     u32,
@@ -83,6 +84,8 @@ pub enum Tag {
     GetVCMemory = 0x0001_0006,
     GetClocks = 0x0001_0007,
 
+    SetPowerState = 0x0002_8001,
+
     SetClockRate = 0x0003_8002,
 }
 
@@ -90,6 +93,20 @@ pub enum Tag {
 #[repr(u32)]
 pub enum Clock {
     UART = 0x0000_0002,
+}
+
+#[derive(IterableEnum)]
+#[repr(u32)]
+pub enum Device {
+    SDCard = 0x0,
+    UART0 = 0x1,
+    UART1 = 0x2,
+    UsbHcd = 0x3,
+    I2C0 = 0x4,
+    I2C1 = 0x5,
+    I2C2 = 0x6,
+    SPI = 0x7,
+    CCP2TX = 0x8,
 }
 
 #[allow(non_camel_case_types)]
@@ -240,6 +257,15 @@ impl Message {
         let message = Message::new();
         let result = message.send_property(Tag::GetArmMemory, 8)?;
         Ok((result.buffer[0].load(Ordering::Relaxed), result.buffer[1].load(Ordering::Relaxed)))
+    }
+
+    pub fn set_power_state(device: Device, state: bool, wait_for_completion: bool) -> Result<bool> {
+        let message = Message::new();
+        message.buffer[0].store(device as u32, Ordering::Relaxed);
+        message.buffer[1].store((state as u32) + ((wait_for_completion as u32) << 1), Ordering::Relaxed);
+
+        let result = message.send_property(Tag::SetPowerState, 8)?;
+        Ok(result.buffer[1].load(Ordering::Relaxed) & 0x1 == 1)
     }
 
     pub fn set_clock_rate(clock: Clock, rate: u32, skip_setting_turbo: u32) -> Result<u32> {

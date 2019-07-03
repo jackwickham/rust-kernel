@@ -1,5 +1,5 @@
 [package]
-name = "kernel8"
+name = "kernel"
 version = "0.1.0"
 authors = ["Jack Wickham <jackwickham@live.co.uk>"]
 edition = "2018"
@@ -8,3 +8,10 @@ edition = "2018"
 init = { path = "init" }
 macros = { path = "macros" }
 register = "0.3.2"
+
+[workspace]
+members = [
+    "init",
+    "macros",
+    "macro_tests",
+]

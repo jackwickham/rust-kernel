@@ -8,12 +8,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel8"
+name = "kernel"
 version = "0.1.0"
 dependencies = [
  "init 0.1.0",
  "macros 0.1.0",
  "register 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "macro_tsts"
+version = "0.1.0"
+dependencies = [
+ "macros 0.1.0",
 ]
 
 [[package]]

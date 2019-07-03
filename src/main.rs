@@ -7,8 +7,6 @@
 #![feature(const_raw_ptr_deref)]
 #![feature(never_type)]
 
-extern crate register;
-
 mod gpio;
 mod uart1;
 mod uart0;
@@ -17,6 +15,7 @@ mod panic_handler;
 mod self_update;
 mod random;
 mod timer;
+mod power;
 
 const MMIO_BASE: usize = 0x3F00_0000;
 
@@ -60,9 +59,6 @@ fn entry() -> ! {
         Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
     }
 
-    timer::get_timer().sleep_usec(1_000_000);
-    uart.puts("Slept for one second");
-
     let rand = random::get_rng();
     rand.init();
 
@@ -78,6 +74,10 @@ fn entry() -> ! {
             uart.puts("0x");
             uart.send_hex_u32(rand.rand());
             uart.newline();
+        } else if c == 'R' {
+            power::get_power_manager().reboot();
+        } else if c == 's' {
+            power::get_power_manager().shutdown().unwrap();
         } else {
             uart.send(c);
         }
