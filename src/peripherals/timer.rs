@@ -63,7 +63,7 @@ impl SystemTimer {
             // assume that it hasn't overflowed again
         }
 
-        ((high as u64) << 32) + (low as u64)
+        (u64::from(high) << 32) + u64::from(low)
     }
 }
 

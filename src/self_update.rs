@@ -12,7 +12,6 @@ extern "C" {
 
 #[derive(Debug)]
 pub enum UpdateError {
-    InvalidMessage,
     MailboxError(mailbox::MailboxError),
     SizeError,
 }

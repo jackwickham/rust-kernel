@@ -1,28 +1,3 @@
-/*
- * MIT License
- *
- * Copyright (c) 2018 Andre Richter <andre.o.richter@gmail.com>
- * Copyright (C) 2019 Jack Wickham
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 use crate::peripherals::MMIO_BASE;
 use crate::peripherals::timer::sleep_cycles;
 use crate::peripherals::gpio;
@@ -127,7 +102,6 @@ pub fn get_uart() -> &'static mut Uart {
 #[derive(Debug)]
 pub enum UartError {
     MailboxError(mailbox::MailboxError),
-    UnknownError,
 }
 pub type Result<T> = ::core::result::Result<T, UartError>;
 
@@ -152,9 +126,8 @@ impl Uart {
         self.CR.set(0);
 
         // Set the UART clock speed
-        match mailbox::set_clock_rate(mailbox::Clock::UART, 4_000_000, 0) {
-            Err(e) => return Err(UartError::MailboxError(e)),
-            _ => (),
+        if let Err(e) = mailbox::set_clock_rate(mailbox::Clock::UART, 4_000_000, 0) {
+            return Err(UartError::MailboxError(e));
         }
 
         gpio::GPFSEL1.modify(gpio::GPFSEL1::FSEL14::TXD0 + gpio::GPFSEL1::FSEL15::RXD0);
@@ -216,7 +189,7 @@ impl Uart {
     pub fn send_hex_u32(&self, n: u32) {
         let mut chars: [u8; 8] = [0; 8];
         for i in 0..8 {
-            let mut v: u8 = ((n >> i * 4) & 0xF) as u8;
+            let mut v: u8 = ((n >> (i * 4)) & 0xF) as u8;
             if v >= 10 {
                 v += 55;
             } else {
@@ -233,7 +206,7 @@ impl Uart {
     pub fn send_hex_u8(&self, n: u8) {
         let mut chars: [u8; 2] = [0; 2];
         for i in 0..2 {
-            let mut v: u8 = ((n >> i * 4) & 0xF) as u8;
+            let mut v: u8 = ((n >> (i * 4)) & 0xF) as u8;
             if v >= 10 {
                 v += 55;
             } else {

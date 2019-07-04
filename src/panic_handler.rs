@@ -5,6 +5,7 @@ use core::fmt;
 use core::panic::PanicInfo;
 
 #[panic_handler]
+#[allow(unused_must_use)]
 fn panic(info: &PanicInfo) -> ! {
     let mut uart = get_uart();
     uart.init();

@@ -2,11 +2,10 @@ use crate::peripherals::mailbox;
 use core::sync::atomic::{fence, Ordering};
 use core::convert::TryInto;
 
-use macros::*;
-
 const MAILBOX_BUFFER_SIZE: usize = 42;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum PropertyTag {
     AllocateFrameBuffer = 0x0004_0001,
     ReleaseFrameBuffer = 0x0004_8001,
@@ -56,12 +55,14 @@ pub enum PropertyTag {
 }
 
 #[repr(u32)]
+#[allow(dead_code)]
 pub enum PixelOrder {
     BGR = 0x0,
     RGB = 0x1,
 }
 
 #[repr(u32)]
+#[allow(dead_code)]
 pub enum AlphaMode {
     /// When enabled, an alpha value of 0 = fully opaque, 255 = fully transparent
     Enabled = 0x0,
@@ -99,6 +100,7 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
+    #[allow(clippy::identity_op)]
     pub fn new(width: u32, height: u32) -> Result<FrameBuffer, FrameBufferCreationError> {
         let buffer = MailboxBuffer {
             buffer: [
@@ -143,7 +145,7 @@ impl FrameBuffer {
 
                 PropertyTag::GetPitch as u32,           // 30
                 1 * 4,                                  // 31
-                0 * 4,                                  // 32
+                0,                                      // 32
                 0, // Padding for response              // 33
 
                 PropertyTag::SetOverscan as u32,        // 34
@@ -186,7 +188,7 @@ impl FrameBuffer {
 
         // All good, save and return
         Ok(FrameBuffer {
-            buffer: (buffer.buffer[28] & 0x3FFFFFFF) as usize as *mut u32,
+            buffer: (buffer.buffer[28] & 0x3FFF_FFFF) as usize as *mut u32,
             buffer_size: buffer.buffer[29] as usize,
             pitch: buffer.buffer[33] as usize,
             width: width as usize,
@@ -207,9 +209,9 @@ impl FrameBuffer {
     #[inline]
     pub fn set_pixel(&mut self, x: usize, y: usize, r: u8, g: u8, b: u8, a: u8) {
         assert!(x < self.width && y < self.height);
-        let val = (r as u32) | ((g as u32) << 8) | ((b as u32) << 16) | ((a as u32) << 24);
+        let val = u32::from(r) | (u32::from(g) << 8) | (u32::from(b) << 16) | (u32::from(a) << 24);
         unsafe {
-            self.buffer.offset((y * self.pitch / 4 + x) as isize).write_volatile(val);
+            self.buffer.add(y * self.pitch / 4 + x).write_volatile(val);
         }
     }
 }

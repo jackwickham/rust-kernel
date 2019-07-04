@@ -36,7 +36,7 @@ pub unsafe extern "C" fn reset() -> ! {
     // .bss contains the zero-initialised static variables, so we need to zero
     // that section of the memory
     let mut addr: *mut u64 = &mut __bss_start;
-    while addr < &mut __bss_end {
+    while (addr as usize) < (&mut __bss_end as *mut u64 as usize) {
         ptr::write_volatile(addr, 0);
         addr = addr.offset(1);
     }

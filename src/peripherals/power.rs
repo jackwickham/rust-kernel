@@ -61,6 +61,7 @@ impl PowerManager {
         self.reboot();
     }
 
+    #[allow(clippy::empty_loop)]
     pub fn reboot(&self) -> ! {
         self.WDOG.set(REBOOT_WATCHDOG_TIMEOUT | PASSWORD);
         self.RSTC.set(self.RSTC.get() & 0xFFFF_FFCF | PASSWORD | 0x0000_0020);

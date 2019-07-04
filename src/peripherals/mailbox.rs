@@ -255,7 +255,7 @@ pub fn get_mac() -> Result<[u8; 6]> {
 pub fn get_serial() -> Result<u64> {
     let mut message = Message::new();
     message.send(Tag::GetSerial, &[], 8)?;
-    Ok(message.get_response()[0] as u64 + ((message.get_response()[1] as u64) << 32))
+    Ok(u64::from(message.get_response()[0]) + (u64::from(message.get_response()[1]) << 32))
 }
 
 /// Get the base address and size of the ram allocated to the ARM core
@@ -267,7 +267,8 @@ pub fn get_memory_range() -> Result<(u32, u32)> {
 
 pub fn set_power_state(device: Device, state: bool, wait_for_completion: bool) -> Result<bool> {
     let mut message = Message::new();
-    message.send(Tag::SetPowerState, &[device as u32, state as u32], 8)?;
+    let flags = u32::from(state) + (u32::from(wait_for_completion) << 1);
+    message.send(Tag::SetPowerState, &[device as u32, flags], 8)?;
     Ok(message.get_response()[1] & 0x1 == 1)
 }
 

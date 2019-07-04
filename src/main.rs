@@ -61,7 +61,7 @@ fn entry() -> ! {
         let c = uart.getc();
         if c == '^' {
             if let Err(e) = self_update::self_update(uart) {
-                ::core::fmt::write(uart, format_args!("{:?}", e));
+                ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap();
             }
         } else if c == '\n' {
             uart.newline();
