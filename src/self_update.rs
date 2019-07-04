@@ -1,5 +1,5 @@
-use crate::uart0::Uart;
-use crate::mailbox;
+use crate::peripherals::uart0::Uart;
+use crate::peripherals::mailbox;
 use core::ptr;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::mem::transmute;

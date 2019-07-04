@@ -7,26 +7,19 @@
 #![feature(const_raw_ptr_deref)]
 #![feature(never_type)]
 
-mod gpio;
-mod uart0;
-mod mailbox;
+mod peripherals;
 mod panic_handler;
 mod self_update;
-mod random;
-mod timer;
-mod power;
-
-const MMIO_BASE: usize = 0x3F00_0000;
 
 fn entry() -> ! {
-    let uart = uart0::get_uart();
+    let uart = peripherals::uart0::get_uart();
 
     uart.init().unwrap();
     uart.puts("\nInitialising...\n");
     uart.newline();
 
     uart.puts("Mac address: ");
-    match mailbox::Message::get_mac() {
+    match peripherals::mailbox::Message::get_mac() {
         Ok(mac) => {
             for i in 0..6 {
                 uart.send_hex_u8(mac[i]);
@@ -38,7 +31,7 @@ fn entry() -> ! {
     uart.newline();
 
     uart.puts("Serial number: ");
-    match mailbox::Message::get_serial() {
+    match peripherals::mailbox::Message::get_serial() {
         Ok(serial) => {
             uart.send_hex_u64(serial as u64);
         },
@@ -46,7 +39,7 @@ fn entry() -> ! {
     }
     uart.newline();
 
-    match mailbox::Message::get_memory_range() {
+    match peripherals::mailbox::Message::get_memory_range() {
         Ok((base, length)) => {
             uart.puts("Memory size: 0x");
             uart.send_hex_u32(length);
@@ -57,7 +50,7 @@ fn entry() -> ! {
         Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
     }
 
-    let rand = random::get_rng();
+    let rand = peripherals::random::get_rng();
     rand.init();
 
     loop {
@@ -73,9 +66,9 @@ fn entry() -> ! {
             uart.send_hex_u32(rand.rand());
             uart.newline();
         } else if c == 'R' {
-            power::get_power_manager().reboot();
+            peripherals::power::get_power_manager().reboot();
         } else if c == 's' {
-            power::get_power_manager().shutdown().unwrap();
+            peripherals::power::get_power_manager().shutdown().unwrap();
         } else {
             uart.send(c);
         }

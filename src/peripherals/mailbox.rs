@@ -1,4 +1,4 @@
-use super::{MMIO_BASE};
+use crate::peripherals::MMIO_BASE;
 use register::{mmio::{ReadOnly, WriteOnly}, register_bitfields};
 use core::hint::spin_loop;
 use core::sync::atomic::{compiler_fence, Ordering, AtomicU8, AtomicU32};

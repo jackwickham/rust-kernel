@@ -1,5 +1,5 @@
-use crate::uart0::get_uart;
-use crate::power;
+use crate::peripherals::uart0::get_uart;
+use crate::peripherals::power;
 
 use core::fmt;
 use core::panic::PanicInfo;

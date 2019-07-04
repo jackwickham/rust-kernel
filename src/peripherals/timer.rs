@@ -1,4 +1,4 @@
-use super::MMIO_BASE;
+use crate::peripherals::MMIO_BASE;
 use register::{mmio::*, register_bitfields};
 
 register_bitfields! {

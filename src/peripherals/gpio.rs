@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-use super::MMIO_BASE;
+use crate::peripherals::MMIO_BASE;
 use register::{mmio::ReadWrite, register_bitfields, IntLike, RegisterLongName};
 use core::ops::Deref;
 

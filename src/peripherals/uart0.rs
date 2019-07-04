@@ -23,10 +23,10 @@
  * SOFTWARE.
  */
 
-use super::MMIO_BASE;
-use crate::timer::sleep_cycles;
-use crate::gpio;
-use crate::mailbox;
+use crate::peripherals::MMIO_BASE;
+use crate::peripherals::timer::sleep_cycles;
+use crate::peripherals::gpio;
+use crate::peripherals::mailbox;
 use core::hint::spin_loop;
 use core::fmt::Write;
 use register::{mmio::*, register_bitfields};
