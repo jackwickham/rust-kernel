@@ -24,13 +24,15 @@
 
 TARGET = aarch64-unknown-none
 
-SOURCES = $(wildcard **/*.rs) $(wildcard **/*.S) link.ld
+# -_- there's no built in way to do recursive wildcards...
+# https://stackoverflow.com/a/2483203/2826188
+SOURCES = $(shell find -type f -name '*.rs') $(shell find -type f -name '*.S') link.ld
 
 CARGO_OUTPUT = target/$(TARGET)/release/kernel
 
 BUILD_VERSION = --release
 
-.PHONY: all qemu clippy clean objdump nm
+.PHONY: all clippy clean objdump nm
 
 all: clean kernel8.img
 

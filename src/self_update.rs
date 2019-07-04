@@ -1,4 +1,4 @@
-use crate::uart0;
+use crate::uart0::Uart;
 use crate::mailbox;
 use core::ptr;
 use core::sync::atomic::{compiler_fence, Ordering};
@@ -17,7 +17,7 @@ pub enum UpdateError {
     SizeError,
 }
 
-pub fn self_update(uart: &uart0::Uart) -> Result<!, UpdateError> {
+pub fn self_update(uart:  &Uart) -> Result<!, UpdateError> {
     let self_update_code_start: usize = unsafe { &__self_update_code_start as *const usize as usize };
     let self_update_code_end: usize = unsafe { &__self_update_code_end as *const usize as usize };
     let program_end: usize = unsafe { &__program_end as *const usize as usize };
@@ -64,7 +64,7 @@ pub fn self_update(uart: &uart0::Uart) -> Result<!, UpdateError> {
         uart.send(0x12 as char);
 
         // Now construct a pointer to the new function
-        let self_update_fn: extern "C" fn (usize, usize, *const uart0::Uart) -> ! = transmute(new_self_update_loc);
+        let self_update_fn: extern "C" fn (usize, usize, &Uart) -> ! = transmute(new_self_update_loc);
         // (the signature is (start_address, length, uart_addr))
         // finally, call it
         self_update_fn(0x80_000, new_size as usize, uart)

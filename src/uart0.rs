@@ -2,6 +2,7 @@
  * MIT License
  *
  * Copyright (c) 2018 Andre Richter <andre.o.richter@gmail.com>
+ * Copyright (C) 2019 Jack Wickham
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,10 +27,8 @@ use super::MMIO_BASE;
 use crate::timer::sleep_cycles;
 use crate::gpio;
 use crate::mailbox;
-use core::{
-    hint::spin_loop,
-    fmt::Write
-};
+use core::hint::spin_loop;
+use core::fmt::Write;
 use register::{mmio::*, register_bitfields};
 
 // PL011 UART registers.
@@ -246,6 +245,11 @@ impl Uart {
         for i in 0..2 {
             self.send(chars[i] as char);
         }
+    }
+
+    pub fn send_hex_u64(&self, n: u64) {
+        self.send_hex_u32((n >> 32) as u32);
+        self.send_hex_u32(n as u32);
     }
 
     pub fn newline(&self) {

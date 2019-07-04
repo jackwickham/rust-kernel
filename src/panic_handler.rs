@@ -1,4 +1,4 @@
-use crate::uart1::MiniUart;
+use crate::uart0::get_uart;
 use crate::power;
 
 use core::fmt;
@@ -6,7 +6,7 @@ use core::panic::PanicInfo;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let mut uart = MiniUart::new();
+    let mut uart = get_uart();
     uart.init();
     
     fmt::write(&mut uart, format_args!("{:?}", info));

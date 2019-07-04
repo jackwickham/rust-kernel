@@ -1,8 +1,6 @@
 #![no_std]
 #![feature(global_asm)]
 
-//extern crate panic_abort;
-
 use core::ptr;
 
 // Wrap the user-defined entry point

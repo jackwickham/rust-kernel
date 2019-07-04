@@ -8,7 +8,6 @@
 #![feature(never_type)]
 
 mod gpio;
-mod uart1;
 mod uart0;
 mod mailbox;
 mod panic_handler;
@@ -41,8 +40,7 @@ fn entry() -> ! {
     uart.puts("Serial number: ");
     match mailbox::Message::get_serial() {
         Ok(serial) => {
-            uart.send_hex_u32((serial >> 32) as u32);
-            uart.send_hex_u32((serial & 0xFFFF_FFFF) as u32);
+            uart.send_hex_u64(serial as u64);
         },
         Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
     }
@@ -65,7 +63,7 @@ fn entry() -> ! {
     loop {
         let c = uart.getc();
         if c == '^' {
-            if let Err(e) = self_update::self_update(&uart) {
+            if let Err(e) = self_update::self_update(uart) {
                 ::core::fmt::write(uart, format_args!("{:?}", e));
             }
         } else if c == '\n' {
