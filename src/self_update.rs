@@ -32,7 +32,7 @@ pub fn self_update(uart:  &Uart) -> Result<!, UpdateError> {
     let new_size = new_size as usize;
 
     // Query the GPU to find out how much RAM we have
-    let (_base, available_memory) = match mailbox::Message::get_memory_range() {
+    let (_base, available_memory) = match mailbox::get_memory_range() {
         Ok(r) => r,
         Err(e) => {
             uart.send(0x18 as char);

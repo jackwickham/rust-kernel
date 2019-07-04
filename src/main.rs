@@ -7,6 +7,7 @@
 #![feature(const_raw_ptr_deref)]
 #![feature(never_type)]
 
+mod display;
 mod peripherals;
 mod panic_handler;
 mod self_update;
@@ -19,7 +20,7 @@ fn entry() -> ! {
     uart.newline();
 
     uart.puts("Mac address: ");
-    match peripherals::mailbox::Message::get_mac() {
+    match peripherals::mailbox::get_mac() {
         Ok(mac) => {
             for i in 0..6 {
                 uart.send_hex_u8(mac[i]);
@@ -31,7 +32,7 @@ fn entry() -> ! {
     uart.newline();
 
     uart.puts("Serial number: ");
-    match peripherals::mailbox::Message::get_serial() {
+    match peripherals::mailbox::get_serial() {
         Ok(serial) => {
             uart.send_hex_u64(serial as u64);
         },
@@ -39,7 +40,7 @@ fn entry() -> ! {
     }
     uart.newline();
 
-    match peripherals::mailbox::Message::get_memory_range() {
+    match peripherals::mailbox::get_memory_range() {
         Ok((base, length)) => {
             uart.puts("Memory size: 0x");
             uart.send_hex_u32(length);
@@ -52,6 +53,9 @@ fn entry() -> ! {
 
     let rand = peripherals::random::get_rng();
     rand.init();
+
+    let mut frame_buffer = display::frame_buffer::FrameBuffer::new(1920, 1080).unwrap();
+    frame_buffer.draw();
 
     loop {
         let c = uart.getc();

@@ -27,7 +27,7 @@ impl PowerManager {
     pub fn shutdown(&self) -> Result<!> {
         // Shut down all of the devices
         for device in mailbox::Device::values() {
-            if let Err(e) = mailbox::Message::set_power_state(device, false, false) {
+            if let Err(e) = mailbox::set_power_state(device, false, false) {
                 return Err(PowerError::MailboxError(e));
             }
         }

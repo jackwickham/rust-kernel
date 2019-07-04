@@ -1,8 +1,9 @@
 use crate::peripherals::MMIO_BASE;
 use register::{mmio::{ReadOnly, WriteOnly}, register_bitfields};
 use core::hint::spin_loop;
-use core::sync::atomic::{compiler_fence, Ordering, AtomicU8, AtomicU32};
+use core::sync::atomic::{fence, Ordering};
 use core::slice;
+use core::convert::{TryFrom, TryInto};
 use macros::*;
 
 register_bitfields!{
@@ -109,14 +110,16 @@ pub enum Device {
     CCP2TX = 0x8,
 }
 
-#[allow(non_camel_case_types)]
-#[allow(dead_code)]
+#[derive(TryFrom)]
 #[repr(u32)]
-pub enum RequestResponseCode {
-    REQUEST = 0x0,
+pub enum ResponseCode {
+    Success = 0x8000_0000,
+    Error = 0x8000_0001,
+}
 
-    SUCCESS = 0x8000_0000,
-    ERROR = 0x8000_0001,
+#[repr(u32)]
+pub enum RequestCode {
+    Request = 0x0,
 }
 
 const MESSAGE_SIZE: usize = 12;
@@ -125,164 +128,192 @@ const MESSAGE_SIZE: usize = 12;
 #[repr(C)]
 #[repr(align(16))]
 pub struct Message {
-    pub message_size: AtomicU32,
-    pub request_response_code: AtomicU32,
-    pub tag_identifier: AtomicU32,
-    pub value_buffer_size: AtomicU32,
-    pub value_length: AtomicU32,
-    pub buffer: [AtomicU32; MESSAGE_SIZE],
-    reserved: u32,
+    buffer: [u32; MESSAGE_SIZE],
 }
 
 impl Message {
     /// Construct a new message to send
     pub fn new() -> Message {
-        let buf: [AtomicU32; MESSAGE_SIZE] = Default::default();
-        Message {
-            message_size: AtomicU32::new((MESSAGE_SIZE + 6) as u32 * 4),
-            request_response_code: AtomicU32::new(RequestResponseCode::REQUEST as u32),
-            tag_identifier: AtomicU32::new(Tag::Last as u32),
-            value_buffer_size: AtomicU32::new(MESSAGE_SIZE as u32 * 4),
-            value_length: AtomicU32::new(0),
-            buffer: buf,
-            reserved: 0,
+        let mut msg = Message {
+            buffer: [0; MESSAGE_SIZE]
+        };
+
+        msg.set_message_size(MESSAGE_SIZE * 4);
+        msg.set_request_code(RequestCode::Request);
+        msg.set_value_buffer_size((MESSAGE_SIZE - 6) * 4);
+
+        msg
+    }
+
+    #[inline]
+    pub fn set_tag(&mut self, val: Tag) {
+        self.buffer[2] = val as u32;
+    }
+
+    #[inline]
+    pub fn set_query(&mut self, query: &[u32]) {
+        self.buffer[4] = (query.len() * 4) as u32;
+        let mut index = 5;
+        for value in query {
+            self.buffer[index] = *value;
+            index += 1;
         }
     }
 
-    pub fn call(self, channel: Channel) -> Result<Message> {
-        // The address of the buffer has to be coerced into a 32 bit pointer.
-        // Because we are using physical addresses and there's max 1GB of RAM,
-        // the address will fit within that (even though it's a 64 bit CPU)
-        let buf_ptr = &self as *const Message as u32;
-        
-        // The message is the upper 28 bits of the pointer in the upper 28 bits
-        // of the message, and the channel in the lower 4 bits
-        let msg: u32 = (buf_ptr & !0x0F) | (channel as u32);
+    #[inline]
+    fn set_message_size(&mut self, val: usize) {
+        self.buffer[0] = val as u32;
+    }
 
-        // Wait for there to be space in the mailbox (I think that should always
-        // be the case anyway)
-        while get_mailbox_1().STATUS.is_set(STATUS::FULL) {
-            spin_loop();
+    #[inline]
+    fn set_request_code(&mut self, code: RequestCode) {
+        self.buffer[1] = code as u32;
+    }
+
+    #[inline]
+    fn set_value_buffer_size(&mut self, val: usize) {
+        self.buffer[3] = val as u32;
+    }
+
+    #[inline]
+    pub fn get_response_code(&self) -> Result<ResponseCode> {
+        match self.buffer[1].try_into() {
+            Err(_) => Err(MailboxError::UnknownError),
+            Ok(v) => Ok(v)
+        }
+    }
+
+    #[inline]
+    pub fn is_response(&self) -> bool {
+        self.buffer[4] & 0x8000_0000 != 0
+    }
+
+    #[inline]
+    pub fn get_response_length(&self) -> u32 {
+        self.buffer[4] & 0x7FFF_FFFF
+    }
+
+    #[inline]
+    pub fn get_response(&self) -> &[u32] {
+        self.buffer.split_at(5).1.split_at(5 + (self.get_response_length() as usize / 4)).0
+    }
+
+    pub fn send(&mut self, tag: Tag, query: &[u32], expected_len: u32) -> Result<()> {
+        if expected_len > ((MESSAGE_SIZE - 6) * 4) as u32 {
+            return Err(MailboxError::OverflowError);
         }
 
-        // Make sure no memory operations cross this point.
-        // The processor on the pi executes in-order, so it doesn't need to be
-        // exposed as a fence in the actual instructions
-        compiler_fence(Ordering::Release);
+        self.set_tag(tag);
+        self.set_query(query);
 
-        // Send it!
-        get_mailbox_1().DATA.set(msg);
+        // The address of the buffer has to be coerced into a 32 bit pointer
+        let buf_ptr = self as *mut Message as u32;
 
-        // Wait for the response
-        let mailbox0 = get_mailbox_0();
-        loop {
-            if !mailbox0.STATUS.is_set(STATUS::EMPTY) {
-                // Peek at the message and see if it's for us
-                let resp: u32 = mailbox0.DATA.get();
-                if (resp & !0x0F) == (buf_ptr & !0x0F) {
-                    // It is for us, so pop it off then check whether it's the
-                    // response that we care about
-                    if (resp & 0x0F) == (channel as u32) {
-                        // This is the one we're interested in
-                        // First we need to insert a barrier so we can't speculate this
-                        compiler_fence(Ordering::Acquire);
+        // The message is the upper 28 bits of the pointer in the upper 28 bits
+        // of the message, and the channel in the lower 4 bits
+        let msg: u32 = buf_ptr & !0x0F;
 
-                        return match self.request_response_code.load(Ordering::Relaxed) {
-                            v if v == RequestResponseCode::SUCCESS as u32 => Ok(self),
-                            v if v == RequestResponseCode::ERROR as u32 => Err(MailboxError::ResponseError),
-                            v => Err(MailboxError::UnknownError),
-                        }
+        // send it
+        mailbox_call(Channel::PropertyTagsVC, msg);
+
+        match self.get_response_code()? {
+            ResponseCode::Success => {
+                if !self.is_response() {
+                    Err(MailboxError::UnknownError)
+                } else {
+                    let size = self.get_response_length();
+                    if size != expected_len {
+                        Err(MailboxError::SizeError(size))
+                    } else {
+                        Ok(())
                     }
                 }
             }
-
-            spin_loop();
+            ResponseCode::Error => Err(MailboxError::ResponseError),
         }
     }
+}
 
-    pub fn send_property(self, tag: Tag, expected_len: u32) -> Result<Message> {
-        if expected_len > MESSAGE_SIZE as u32 {
-            return Err(MailboxError::OverflowError);
+/// Get the firmware revision of this board
+pub fn get_firmware_revision() -> Result<u32> {
+    let mut message = Message::new();
+    message.send(Tag::GetFirmware, &[], 4)?;
+    Ok(message.get_response()[0])
+}
+
+/// Get the mac address of this board
+pub fn get_mac() -> Result<[u8; 6]> {
+    let mut message = Message::new();
+    message.send(Tag::GetMac, &[], 6)?;
+    let mac: &[u8] = unsafe {
+        slice::from_raw_parts(message.get_response().as_ptr() as *const u8, 6)
+    };
+    Ok([mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]])
+}
+
+/// Get the serial number of this board
+pub fn get_serial() -> Result<u64> {
+    let mut message = Message::new();
+    message.send(Tag::GetSerial, &[], 8)?;
+    Ok(message.get_response()[0] as u64 + ((message.get_response()[1] as u64) << 32))
+}
+
+/// Get the base address and size of the ram allocated to the ARM core
+pub fn get_memory_range() -> Result<(u32, u32)> {
+    let mut message = Message::new();
+    message.send(Tag::GetArmMemory, &[], 8)?;
+    Ok((message.get_response()[0], message.get_response()[1]))
+}
+
+pub fn set_power_state(device: Device, state: bool, wait_for_completion: bool) -> Result<bool> {
+    let mut message = Message::new();
+    message.send(Tag::SetPowerState, &[device as u32, state as u32], 8)?;
+    Ok(message.get_response()[1] & 0x1 == 1)
+}
+
+pub fn set_clock_rate(clock: Clock, rate: u32, skip_setting_turbo: u32) -> Result<u32> {
+    let mut message = Message::new();
+    message.send(Tag::SetClockRate, &[clock as u32, rate, skip_setting_turbo], 8)?;
+    Ok(message.get_response()[1])
+}
+
+
+pub fn mailbox_call(channel: Channel, msg: u32) {
+    let msg = msg | (channel as u32);
+
+    // Wait for there to be space in the mailbox (I think that should always
+    // be the case anyway)
+    while get_mailbox_1().STATUS.is_set(STATUS::FULL) {
+        spin_loop();
+    }
+
+    // Make sure no memory operations cross this point.
+    // The processor on the pi executes in-order, so it doesn't need to be
+    // exposed as a fence in the actual instructions
+    fence(Ordering::Release);
+
+    // Send it!
+    get_mailbox_1().DATA.set(msg);
+
+    // Wait for the response
+    let mailbox0 = get_mailbox_0();
+    loop {
+        if !mailbox0.STATUS.is_set(STATUS::EMPTY) {
+            // Peek at the message and see if it's for us
+            let resp: u32 = mailbox0.DATA.get();
+            if (resp & !0x0F) == (msg & !0x0F) {
+                // It is for us, so pop it off then check whether it's the
+                // response that we care about
+                if (resp & 0x0F) == (channel as u32) {
+                    // This is the one we're interested in
+                    // First we need to insert a barrier so we can't speculate this
+                    fence(Ordering::Acquire);
+
+                    return;
+                }
+            }
         }
-        self.tag_identifier.store(tag as u32, Ordering::Relaxed);
 
-        // send it
-        let result = self.call(Channel::PropertyTagsVC)?;
-
-        if result.value_length.load(Ordering::Relaxed) & 0x8000_0000 != 0x8000_0000 {
-            return Err(MailboxError::UnknownError);
-        }
-
-        let size = result.value_length.load(Ordering::Relaxed) & 0x7FFF_FFFF;
-        if size != expected_len {
-            Err(MailboxError::SizeError(size))
-        } else {
-            Ok(result)
-        }
-    }
-
-    /// Get the firmware revision of this board
-    pub fn get_firmware_revision() -> Result<u32> {
-        let message = Message::new();
-        let result = message.send_property(Tag::GetFirmware, 4)?;
-        Ok(result.buffer[0].load(Ordering::Relaxed))
-    }
-
-    /// Get the mac address of this board
-    pub fn get_mac() -> Result<[u8; 6]> {
-        let message = Message::new();
-        let result = message.send_property(Tag::GetMac, 6)?;
-        let mac: &[AtomicU8] = unsafe {
-            slice::from_raw_parts(result.buffer.as_ptr() as *const AtomicU8, 6)
-        };
-        Ok([
-            mac[0].load(Ordering::Relaxed), mac[1].load(Ordering::Relaxed),
-            mac[2].load(Ordering::Relaxed), mac[3].load(Ordering::Relaxed),
-            mac[4].load(Ordering::Relaxed), mac[5].load(Ordering::Relaxed)
-        ])
-    }
-
-    /// Get the serial number of this board
-    pub fn get_serial() -> Result<u64> {
-        let message = Message::new();
-        let result = message.send_property(Tag::GetSerial, 8)?;
-        Ok(
-            result.buffer[0].load(Ordering::Relaxed) as u64 +
-            ((result.buffer[1].load(Ordering::Relaxed) as u64) << 32)
-        )
-    }
-
-    /// Get the base address and size of the ram allocated to the ARM core
-    pub fn get_memory_range() -> Result<(u32, u32)> {
-        let message = Message::new();
-        let result = message.send_property(Tag::GetArmMemory, 8)?;
-        Ok((result.buffer[0].load(Ordering::Relaxed), result.buffer[1].load(Ordering::Relaxed)))
-    }
-
-    pub fn set_power_state(device: Device, state: bool, wait_for_completion: bool) -> Result<bool> {
-        let message = Message::new();
-        message.buffer[0].store(device as u32, Ordering::Relaxed);
-        message.buffer[1].store((state as u32) + ((wait_for_completion as u32) << 1), Ordering::Relaxed);
-
-        let result = message.send_property(Tag::SetPowerState, 8)?;
-        Ok(result.buffer[1].load(Ordering::Relaxed) & 0x1 == 1)
-    }
-
-    pub fn set_clock_rate(clock: Clock, rate: u32, skip_setting_turbo: u32) -> Result<u32> {
-        let message = Message::new();
-        message.buffer[0].store(clock as u32, Ordering::Relaxed);
-        message.buffer[1].store(rate, Ordering::Relaxed);
-        message.buffer[2].store(skip_setting_turbo, Ordering::Relaxed);
-
-        let result = message.send_property(Tag::SetClockRate, 8)?;
-        Ok(result.buffer[1].load(Ordering::Relaxed))
-    }
-
-    fn flush_cache_line(&self) {
-        let addr = self as *const Message as usize;
-        unsafe {
-            asm!("DC CIVAC, $0" :: "r"(addr) :: "volatile");
-        }
-        compiler_fence(Ordering::SeqCst);
+        spin_loop();
     }
 }

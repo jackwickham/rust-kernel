@@ -115,3 +115,86 @@ pub fn make_iterable_enum(input: TokenStream) -> TokenStream {
 }
 
 trait IterableEnum { }
+
+#[proc_macro_derive(TryFrom)]
+pub fn make_enum_tryfrom_u32(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+
+    let name = ast.ident;
+    let result = match ast.data {
+        syn::Data::Enum(data) => {
+            // Loop through the enum variants and generate the mapping
+
+            let mut match_branches = vec![];
+
+            for variant in data.variants {
+                match variant.fields {
+                    // Require all variants to be valueless
+                    syn::Fields::Unit => {
+                        let variant_identifier = variant.ident.clone();
+                        match variant.discriminant {
+                            Some((_, dis)) => match_branches.push(quote!{
+                                #dis => Ok(<#name>::#variant_identifier)
+                            }),
+                            None => {
+                                variant.span().unwrap()
+                                    .error("TryFrom<u32> can only be derived if the discriminants are explicitly specified")
+                                    .emit();
+                                break;
+                            }
+                        }
+                    },
+                    fields => {
+                        // If this variant has an associated value, complain
+                        variant.ident.span().unwrap()
+                            .join(fields.span().unwrap())
+                            .unwrap()
+                            .error("TryFrom<u32> can only be derived with data-free enums")
+                            .emit();
+
+                        // Don't give multiple errors for the same enum.
+                        // We could return here, but that means that no iterator
+                        // will be produced, so the compiler will generate more
+                        // errors where it's used. If we continue, it will
+                        // produce something, so only the error that they need
+                        // to action is displayed.
+                        break;
+                    }
+                };
+            }
+
+            // Create a unique name for the state enum
+            //let error_enum_name_string = format!("{}FromU32Error", name);
+            //let error_enum_name = syn::Ident::new(&error_enum_name_string, name.span());
+
+            quote! {
+                impl TryFrom<u32> for #name {
+                    type Error = u32;
+
+                    fn try_from(v: u32) -> ::core::result::Result<Self, u32> {
+                        match v {
+                            // State transition table for the enum
+                            #(#match_branches,)*
+                            v => Err(v)
+                        }
+                    }
+                }
+            }
+        },
+        syn::Data::Struct(data) => {
+            data.struct_token.span.unwrap().join(name.span().unwrap()).unwrap()
+                .error("TryFrom<u32> can only be derived on enums")
+                .emit();
+            quote!{}
+        },
+        syn::Data::Union(data) => {
+            data.union_token.span.unwrap().join(name.span().unwrap()).unwrap()
+                .error("TryFrom<u32> can only be derived on enums")
+                .emit();
+            quote!{}
+        },
+    };
+    result.into()
+}
+
+

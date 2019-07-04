@@ -152,7 +152,7 @@ impl Uart {
         self.CR.set(0);
 
         // Set the UART clock speed
-        match mailbox::Message::set_clock_rate(mailbox::Clock::UART, 4_000_000, 0) {
+        match mailbox::set_clock_rate(mailbox::Clock::UART, 4_000_000, 0) {
             Err(e) => return Err(UartError::MailboxError(e)),
             _ => (),
         }
