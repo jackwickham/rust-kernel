@@ -6,9 +6,11 @@
 #![feature(const_fn)]
 #![feature(const_raw_ptr_deref)]
 #![feature(never_type)]
+#![feature(format_args_nl)]
 
 mod display;
 mod peripherals;
+mod io;
 mod panic_handler;
 mod self_update;
 
@@ -16,39 +18,32 @@ fn entry() -> ! {
     let uart = peripherals::uart0::get_uart();
 
     uart.init().unwrap();
-    uart.puts("\nInitialising...\n");
-    uart.newline();
+    
+    io::set_console(uart);
 
-    uart.puts("Mac address: ");
+    println!("Hello!");
+
     match peripherals::mailbox::get_mac() {
         Ok(mac) => {
-            for i in 0..6 {
-                uart.send_hex_u8(mac[i]);
-                uart.send(':');
-            }
+            println!("Mac address: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+            );
         },
-        Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
+        Err(e) => println!("{:?}", e),
     };
-    uart.newline();
 
-    uart.puts("Serial number: ");
     match peripherals::mailbox::get_serial() {
         Ok(serial) => {
-            uart.send_hex_u64(serial as u64);
+            println!("Serial number: {:X}", serial);
         },
-        Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
+        Err(e) => println!("{:?}", e),
     }
-    uart.newline();
 
     match peripherals::mailbox::get_memory_range() {
         Ok((base, length)) => {
-            uart.puts("Memory size: 0x");
-            uart.send_hex_u32(length);
-            uart.puts(". Base: 0x");
-            uart.send_hex_u32(base);
-            uart.newline();
+            println!("Memory size: {:#X}B. Base: {:#X}", length, base);
         }
-        Err(e) => ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap(),
+        Err(e) => println!("{:?}", e),
     }
 
     let rand = peripherals::random::get_rng();
@@ -61,20 +56,18 @@ fn entry() -> ! {
         let c = uart.getc();
         if c == '^' {
             if let Err(e) = self_update::self_update(uart) {
-                ::core::fmt::write(uart, format_args!("{:?}", e)).unwrap();
+                println!("{:?}", e);
             }
         } else if c == '\n' {
-            uart.newline();
+            println!();
         } else if c == 'r' {
-            uart.puts("0x");
-            uart.send_hex_u32(rand.rand());
-            uart.newline();
+            println!("{:#x}", rand.rand());
         } else if c == 'R' {
             peripherals::power::get_power_manager().reboot();
         } else if c == 's' {
             peripherals::power::get_power_manager().shutdown().unwrap();
         } else {
-            uart.send(c);
+            print!("{}", c);
         }
     }
 }

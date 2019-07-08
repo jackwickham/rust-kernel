@@ -93,9 +93,9 @@ register_bitfields! {
     ]
 }
 
-pub fn get_uart() -> &'static mut Uart {
+pub fn get_uart() -> &'static Uart {
     unsafe {
-        &mut *((MMIO_BASE + 0x0020_1000) as *mut Uart)
+        &*((MMIO_BASE + 0x0020_1000) as *const Uart)
     }
 }
 

@@ -5,4 +5,3 @@ authors = ["Jack Wickham <jackwickham@live.co.uk>"]
 edition = "2018"
 
 [dependencies]
-panic-abort = "0.3.1"

@@ -53,4 +53,5 @@ pub unsafe extern "C" fn reset() -> ! {
     main();
 }
 
+#[cfg(target_arch = "aarch64")]
 global_asm!(include_str!("boot_cores.S"));

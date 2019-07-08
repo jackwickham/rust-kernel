@@ -16,6 +16,7 @@ pub enum UpdateError {
     SizeError,
 }
 
+#[cfg(target_arch = "aarch64")]
 pub fn self_update(uart:  &Uart) -> Result<!, UpdateError> {
     let self_update_code_start: usize = unsafe { &__self_update_code_start as *const usize as usize };
     let self_update_code_end: usize = unsafe { &__self_update_code_end as *const usize as usize };
@@ -70,6 +71,11 @@ pub fn self_update(uart:  &Uart) -> Result<!, UpdateError> {
     }
 }
 
+#[cfg(not(target_arch = "aarch64"))]
+pub fn self_update(uart:  &Uart) -> Result<!, UpdateError> {
+    unimplemented!();
+}
+
 fn max(a: usize, b: usize) -> usize {
     if a > b {
         a
@@ -78,4 +84,5 @@ fn max(a: usize, b: usize) -> usize {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
 global_asm!(include_str!("self_update.S"));

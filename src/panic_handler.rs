@@ -6,8 +6,9 @@ use core::panic::PanicInfo;
 
 #[panic_handler]
 #[allow(unused_must_use)]
+#[cfg(not(test))]
 fn panic(info: &PanicInfo) -> ! {
-    let mut uart = get_uart();
+    let mut uart = unsafe {&mut*(get_uart() as *const crate::peripherals::uart0::Uart as *mut crate::peripherals::uart0::Uart)};
     uart.init();
     
     fmt::write(&mut uart, format_args!("{:?}", info));
